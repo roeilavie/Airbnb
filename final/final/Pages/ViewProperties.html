@@ -1,0 +1,449 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Journey</title>
+    <link rel="icon" href="../img/logo icon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href="../css/backToTopButton.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">  <!-- Google web font "Open Sans" -->
+    <link rel="stylesheet" href="../font-awesome-4.7.0/css/font-awesome.min.css">                <!-- Font Awesome -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">                                      <!-- Bootstrap style -->
+    <link rel="stylesheet" type="text/css" href="../css/datepicker.css" />
+    <link rel="stylesheet" type="text/css" href="../slick/slick.css" />
+    <link rel="stylesheet" type="text/css" href="../slick/slick-theme.css" />
+    <link rel="stylesheet" href="../css/templatemo-style.css">                                   <!-- Templatemo style -->
+
+
+    <script src="https://kit.fontawesome.com/2d86eab2b9.js" crossorigin="anonymous"></script>
+    <script src="../Scripts/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>             <!-- jQuery (https://jquery.com/download/) -->
+    <script src="../js/popper.min.js"></script>                    <!-- https://popper.js.org/ -->
+    <script src="../js/bootstrap.min.js"></script>                 <!-- https://getbootstrap.com/ -->
+    <script src="../js/datepicker.min.js"></script>                <!-- https://github.com/qodesmith/datepicker -->
+    <script src="../slick/slick.min.js"></script>                  <!-- http://kenwheeler.github.io/slick/ -->
+    <script src="../js/jquery.scrollTo.min.js"></script>           <!-- https://github.com/flesler/jquery.scrollTo -->
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="../Scripts/mutalFunctions.js"></script>
+
+
+    <style>
+        .checked {
+            color: orange;
+        }
+
+        .img-fluid {
+            height: 200px;
+        }
+
+        #previousPage, #nextPage {
+            visibility: hidden;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 3px 3px 3px 3px;
+            text-align: left;
+        }
+
+        .row.buttomRow {
+            justify-content: center;
+        }
+    </style>
+    <script>
+        var map;
+        var location_ = {};
+
+
+        //when the page load
+        $(document).ready(function () {
+            let property = JSON.parse(localStorage.getItem("property"));
+            if (property.Bedrooms != undefined) {
+                advanced();
+            }
+            else {
+                lean();
+            }
+            //check if the user is online - render relevant navbar
+            checkOnlineUser();
+            //get all possible destinations
+            ajaxCall("GET", "../api/Properties/Destinations", "", getDestinationsSCB, getDestinationsECB);
+
+            // Change top navbar on scroll
+            $(window).on("scroll", function () {
+                if ($(window).scrollTop() > 100) {
+                    $(".tm-top-bar").addClass("active");
+                } else {
+                    $(".tm-top-bar").removeClass("active");
+                }
+            });
+
+            //  arrow center picture
+            $('.tm-down-arrow-link').click(function () {
+                $.scrollTo('#tm-section-2', 300, { easing: 'linear' });
+            });
+
+            //arrow button back to top
+
+            const backToTopButton = document.querySelector("#back-to-top-btn");
+            window.addEventListener("scroll", scrollFunction);
+            backToTopButton.addEventListener("click", smoothScrollBackToTop);
+
+            function smoothScrollBackToTop() {
+                const targetPosition = 0;
+                const startPosition = window.pageYOffset;
+                const distance = targetPosition - startPosition;
+                const duration = 750;
+                let start = null;
+                window.requestAnimationFrame(step);
+                function step(timestamp) {
+                    if (!start) start = timestamp;
+                    const progress = timestamp - start;
+                    window.scrollTo(0, easeInOutCubic(progress, startPosition, distance, duration));
+                    if (progress < duration) window.requestAnimationFrame(step);
+                }
+            }
+
+            function easeInOutCubic(t, b, c, d) {
+                t /= d / 2;
+                if (t < 1) return c / 2 * t * t * t + b;
+                t -= 2;
+                return c / 2 * (t * t * t + 2) + b;
+            }
+
+            function scrollFunction() {
+                if (window.pageYOffset > 300) { // Show backToTopButton
+                    if (!backToTopButton.classList.contains("btnEntrance")) {
+                        backToTopButton.classList.remove("btnExit");
+                        backToTopButton.classList.add("btnEntrance");
+                        backToTopButton.style.display = "block";
+                    }
+                }
+                else { // Hide backToTopButton
+                    if (backToTopButton.classList.contains("btnEntrance")) {
+                        backToTopButton.classList.remove("btnEntrance");
+                        backToTopButton.classList.add("btnExit");
+                        setTimeout(function () {
+                            backToTopButton.style.display = "none";
+                        }, 250);
+                    }
+                }
+            }
+
+        });
+
+        //insert the possible destinations and do ajaxcall for reder the top rating properties
+        function getDestinationsSCB(destinations) {
+            let search_property = JSON.parse(localStorage.getItem("property"));
+            setDestinations();
+            if (search_property.Bedrooms != undefined)
+                ajaxCall("POST", `../api/Properties/${search_property}`, JSON.stringify(search_property), getPropertiesSCB, getPropertiesECB);
+            else
+                ajaxCall("POST", `../api/Properties/leanSearch/${search_property}`, JSON.stringify(search_property), getPropLeanSCB, getPropLeanECB);
+        }
+
+        //ajaxcall failed, write to the log
+        function getDestinationsECB(err) {
+            console.log(err);
+        }
+        //rendering the properties from the lean search
+
+        function getPropLeanSCB(propertiesData) {
+            properties = propertiesData;
+            searchResults(properties);
+            window.onscroll = function (ev) {
+
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+                    if (properties.length != 0)
+                        InsertProperties();
+                }
+            };
+        }
+
+        //ajaxcall failed, write to the log
+        function getPropLeanECB(err) {
+            console.log(err);
+        }
+
+        //rendering the properties from the advanced search
+        function getPropertiesSCB(propertiesData) {
+            properties = propertiesData;
+            searchResults(properties);
+            window.onscroll = function (ev) {
+
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+                    if (properties.length != 0)
+                        InsertProperties();
+                }
+            };
+        }
+
+        //ajaxcall failed, write to the log
+        function getPropertiesECB(err) {
+            console.log(err);
+        }
+
+        //update the page with the properties
+        function searchResults(properties) {
+            //if there were no search results - delete the result row
+            //and the map
+            if (properties.length == 0) {
+                $("#entry_line").html("0 <strong>results</strong>, try another search");
+                $("#found").remove();
+                $("#map").remove();
+                $("#4a").hide();
+                return;
+            }
+            //if there were results to the search - render them to the screen
+            $("#entry_line").html("Your <strong>Journey</strong> is our priority");
+            $("#found").html(`We <strong>found</strong> you <strong>${properties.length}</strong> properties!`);
+            $("#4a").show();
+            //set head and tail for the scrolling feature - every 10 properties render 10 more
+            head = 10;
+            tail = 0;
+            InsertProperties();
+        }
+
+        //insert 10 properties to the page
+        function InsertProperties() {
+            let str = "";
+            for (var i = 0; i < properties.length; i++) {
+                //insert markers to google map
+                location_ = { lat: properties[i].Latitude, lng: properties[i].Longitude };
+                var Marker = new google.maps.Marker({
+                    position: location_,
+                    animation: google.maps.Animation.DROP,
+                    icon: "https://www.allianceforthebay.org/wp-content/themes/acb/img/marker-blue.png",
+
+                });
+                var content = `<div style='float:left'>
+                                <a href ="PropertyPage.html"  onclick= "propertyPage(${properties[i].Id})">
+                                <img style='height:150px;border-radius: 50%; width:150px;padding:5%' src= ${properties[i].Picture_url}>
+                                </a></div><div style='float:right; padding: 10px;'><h6>Neigborhood:</h6>Amsterdam, Noord-Holland, Netherlands<br/><br/><h6>Price:</h6>${properties[i].Price} $<br/>
+                                <br/><h6>Bedrooms:</h6>${properties[i].Bedrooms}</div>`;
+                var infowindow = new google.maps.InfoWindow();
+
+                google.maps.event.addListener(Marker, 'click', (function (Marker, content, infowindow) {
+                    return function () {
+                        infowindow.setContent(content);
+                        infowindow.open(map, Marker);
+                    };
+                })(Marker, content, infowindow));
+                google.maps.event.addListener(Marker, 'hover', (function (Marker, content, infowindow) {
+                    return function () {
+                        infowindow.setContent(content);
+                        infowindow.open(map, Marker);
+                    };
+                })(Marker, content, infowindow));
+                Marker.setMap(map);
+                /// end of map markers
+
+            }
+            for (; tail < head; tail++) {
+                //if there are no more properties to render
+                if (tail == properties.length)
+                    break;
+                else {
+                    str += `<div class='tm-recommended-place'>
+                                                      <img src=${properties[tail].Picture_url} alt="Image" class="img-fluid tm-recommended-img">
+                                                        <div class="tm-recommended-description-box">
+                                                          <h3 class="tm-recommended-title">${properties[tail].Property_type}</h3>`;
+                    for (var i = 1; i <= 5; i++) {
+                        if (i < properties[tail].Review_scores_rating)
+                            str += `<i class="fa-solid fa-star checked"></i></h3>`;
+                        else
+                            str += `<i class="fa-solid fa-star"></i></h3>`;
+                    }
+                    str += `<p class="tm-text-highlight">${properties[tail].Name} in ${properties[tail].Location}</p>
+                                                          <p class="tm-text-gray">${properties[tail].Center_distance.toFixed(2)} km from the center<br/>
+                                                            ${properties[tail].Bathrooms_text}<br/>Fits for ${properties[tail].Accommodates}</p></div>
+                                                              <a href="PropertyPage.html" class="tm-recommended-price-box" onclick='saveProperty(${properties[tail].Id})'>
+                                                                <p class="tm-recommended-price">$${properties[tail].Price}</p>
+                                                                <p class="tm-recommended-price-link">Continue Reading</p></a></div>`;
+                }
+            }
+            if (tail < properties.length)
+                head += 10;
+            document.getElementById("searchResults").innerHTML += str;
+        }
+        //if the user press on property, move to property page
+        function propertyPage(id) {
+            localStorage.setItem("PropertyToSave", id);
+            window.location.href = "PropertyPage.html";
+        }
+
+        //save the property id in localstorage
+        function saveProperty(id) {
+            localStorage.setItem("PropertyToSave", id);
+        }
+
+        //google maps initialze
+        function initMap() {
+            // The location of amsterdam
+            const amsterdam = { lat: 52.377956, lng: 4.897070 };
+            // The map, centered at amsterdam
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: amsterdam,
+            });
+        }
+
+    </script>
+
+</head>
+
+<body>
+    <button id="back-to-top-btn"><i class="fas fa-angle-double-up"></i></button>
+    <div class="tm-main-content" id="top">
+        <div class="tm-top-bar-bg"></div>
+        <div class="tm-top-bar" id="tm-top-bar">
+            <div class="container">
+                <div class="row">
+                    <nav class="navbar navbar-expand-lg narbar-light">
+                        <a class="navbar-brand mr-auto" href="index.html">
+                            <img src="../img/logo.png" alt="Site logo">
+                            Journey
+                        </a>
+                        <button type="button" id="nav-toggle" class="navbar-toggler collapsed" data-toggle="collapse" data-target="#mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div id="mainNav" class="collapse navbar-collapse tm-bg-white">
+                        </div>
+                    </nav>
+                </div> <!-- row -->
+            </div> <!-- container -->
+        </div> <!-- .tm-top-bar -->
+
+        <div class="tm-page-wrap mx-auto">
+            <section class="tm-banner">
+                <div class="tm-container-outer tm-banner-bg">
+                    <div class="container">
+
+                        <div class="row tm-banner-row tm-banner-row-header">
+                            <div class="col-xs-12">
+                                <div class="tm-banner-header">
+                                    <h1 class="text-uppercase tm-banner-title">Search results</h1>
+                                    <img src="../img/dots-3.png" alt="Dots">
+                                    <p class="tm-banner-subtitle">Scroll down to see search results.</p>
+                                    <a href="javascript:void(0)" class="tm-down-arrow-link"><i class="fa fa-2x fa-angle-down tm-down-arrow"></i></a>
+                                </div>
+                            </div>  <!-- col-xs-12 -->
+                        </div> <!-- row -->
+                        <div class="row tm-banner-row" id="tm-section-search">
+
+                            <form action="" method="get" class="tm-search-form tm-section-pad-2" id="searchForm">
+                                <div class="form-row tm-search-form-row">
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                        <label for="inputCity">Choose Your Destination</label>
+                                        <select name="destination" class="form-control tm-select" id="inputDestination"></select>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-1">
+                                        <div class="form-group tm-form-group tm-form-group-pad tm-form-group-2">
+                                            <label for="inputRoom">How many rooms?</label>
+                                            <select name="room" class="form-control tm-select" id="inputRoom">
+                                                <option value="1" selected>1 Room</option>
+                                                <option value="2">2 Rooms</option>
+                                                <option value="3">3 Rooms</option>
+                                                <option value="4">4 Rooms</option>
+                                                <option value="5">5 Rooms</option>
+                                                <option value="6">6 Rooms</option>
+                                                <option value="7">7 Rooms</option>
+                                                <option value="8">8 Rooms</option>
+                                                <option value="9">9 Rooms</option>
+                                                <option value="10">10 Rooms</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                            <label for="ReviewScore">Review Score</label>
+                                            <select name="ReviewScore" class="form-control tm-select" id="ReviewScore">
+                                                <option value="1" selected>1</option>
+                                                <option value="2">2</option>
+                                                <option value="3">3</option>
+                                                <option value="4">4</option>
+                                                <option value="5">5</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div> <!-- form-row -->
+                                <div class="form-row tm-search-form-row">
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-3">
+                                        <label for="inputMinPrice">Min Price</label>
+                                        <input name="minPrice" type="text" class="form-control" id="minPrice" placeholder="Min price" required>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-3">
+                                        <label for="inputMaxPrice">Max Price</label>
+                                        <input name="maxPrice" type="text" class="form-control" id="maxPrice" placeholder="Max price" required>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-2">
+                                        <label for="DistFromCenter">Distance from the center</label>
+                                        <input class="slider" type="range" name="ageInputName" id="DistanceFromCenter" value="5" min="0" max="15" oninput="DistanceFromCenterOut.value = DistanceFromCenter.value +'  Km'">
+                                        <output name="ageOutputName" id="DistanceFromCenterOut">5 KM</output>
+                                    </div>
+                                </div>   <!-- form-row -->
+                                <div class="form-row tm-search-form-row">
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-3">
+                                        <label for="inputCheckIn">Check In Date</label>
+                                        <input name="check-in" type="text" class="form-control" id="inputCheckIn" placeholder="Check In" required>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-3">
+                                        <label for="inputCheckOut">Check Out Date</label>
+                                        <input name="check-out" type="text" class="form-control" id="inputCheckOut" placeholder="Check Out" required>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                        <label for="btnSubmit">&nbsp;</label>
+                                        <button type="submit" class="btn btn-primary tm-btn tm-btn-search text-uppercase" id="btnSubmit">Check Availability</button>
+                                    </div>
+                                </div>
+                            </form>
+
+                        </div> <!-- row -->
+                        <div class="tm-banner-overlay"></div>
+                    </div>  <!-- .container -->
+                </div>     <!-- .tm-container-outer -->
+            </section>
+
+            <section class="tm-container-outer tm-bg-gray">
+                <div id="tm-section-2">
+                    <br />
+                    <div class="row">
+                        <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                            <h4 class="text-uppercase mb-4" id="entry_line">Your <strong>Journey</strong> is our priority</h4>
+                            <br />
+
+                            <h5 class="text-uppercase mb-4" id="found"><strong>Great! </strong> we fond you</h5>
+                            <br />
+
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div id="map">
+                        </div>
+                    </div>
+                </div>
+                <br />
+            </section>
+            <!-- Tab 4 -->
+            <div class="tab-pane fade show active" id="4a">
+                <!-- Current Active Tab WITH "show active" classes in DIV tag -->
+                <div class="tm-recommended-place-wrap" id="searchResults">
+                </div>
+                <br />
+                <br />
+            </div>
+
+        </div>
+
+    </div>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDc6bODrRoh3awdyABYFaDcXZKMVQWlHEA&callback=initMap&v=weekly"
+            defer></script>
+
+</body>
+</html>

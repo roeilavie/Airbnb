@@ -1,0 +1,172 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Journey</title>
+    <link rel="icon" href="../img/logo icon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">  <!-- Google web font "Open Sans" -->
+    <link rel="stylesheet" href="../font-awesome-4.7.0/css/font-awesome.min.css">                <!-- Font Awesome -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">                                      <!-- Bootstrap style -->
+    <link rel="stylesheet" href="../css/templatemo-style.css"> <!-- Templatemo style -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/dataTables.bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.dataTables.min.css">
+
+    <script src="../Scripts/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/jquery.scrollTo.min.js"></script>
+    <script src="../Scripts/jquery-3.3.1.min.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.19/js/dataTables.bootstrap.min.js"></script>
+
+    <style>
+        th, td, button {
+            text-align: center;
+        }
+
+        .form-inline {
+            display: block;
+        }
+
+        img {
+            height: 100px;
+            width: 150px;
+        }
+
+        .dtr-details li:nth-child(2) {
+            display: none;
+        }
+
+        .container_table {
+            max-width: 1450px;
+            margin: auto;
+        }
+    </style>
+
+    <script>
+        var properties;
+
+        // will run when the document is ready
+        $(document).ready(function () {
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            let arr = user_online.fullName.split(" ");
+            $("#hello_id").text("Hello, " + arr[0]);
+            // once the document is ready we fetch a list of reservations from the server
+            ajaxCall("GET", `../api/Properties/Properties`, "", getSuccess, error);
+        });
+
+        // this function is activated in case of a success
+        function getSuccess(propertiesData) {
+            try {
+                tbl = $('#propertiesTable').DataTable({
+                    data: propertiesData,
+                    pageLength: 5,
+                    columns: [
+                        {
+                            render: function (data, type, row, meta) {
+                                imgProp = `<a href="PropertyPage.html"> <img src='${row.Picture_url}' onclick="GoToProperty('${row.Id}')"/></a>`;
+                                return imgProp;
+                            }
+                        },
+                        { data: "Id" },
+                        { data: "Name" },
+                        { data: "Host_name" },
+                        { data: "Price" },
+                        { data: "Property_type" },
+                        { data: "Total_cancels" },
+                        { data: "Total_rent_days" }
+                    ],
+                });
+            }
+
+            catch (err) {
+                alert(err);
+            }
+        }
+
+        // this function is activated in case of a failure
+        function error(err) {
+            swal("Error: " + err);
+        }
+
+        //logout function
+        function logOut() {
+            localStorage.removeItem("user_online");
+            localStorage.removeItem("PropertyToSave");
+        }
+
+        //function on image click - go to property page
+        function GoToProperty(property_id) {
+            localStorage.setItem("PropertyToSave", property_id);
+            window.location.href = "PropertyPage.html";
+        }
+    </script>
+
+
+</head>
+<body>
+    <div class="tm-main-content" id="top">
+        <div class="tm-top-bar-bg"></div>
+        <div class="tm-top-bar" id="tm-top-bar">
+            <div class="container">
+                <div class="row">
+                    <nav class="navbar navbar-expand-lg narbar-light">
+                        <a class="navbar-brand mr-auto">
+                            <img src="../img/logo.png" alt="Site logo">
+                            Journey
+                        </a>
+                        <button type="button" id="nav-toggle" class="navbar-toggler collapsed" data-toggle="collapse" data-target="#mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div id="mainNav" class="collapse navbar-collapse tm-bg-white">
+                            <ul class="navbar-nav ml-auto">
+                                <li class="nav-item">
+                                    <a id="hello_id" class="nav-link"></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="UsersManager.html">Users <span class="sr-only">(current)</span></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="HostsManager.html">Hosts</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link active" href="PropertiesManager.html">Properties</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="index.html" onclick="logOut()">Log out</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </nav>
+                </div> <!-- row -->
+            </div> <!-- container -->
+        </div> <!-- .tm-top-bar -->
+    </div>
+    <section class="p-5 container_table">
+        <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+            <div class="mt-5">
+                <table id="propertiesTable" class="display responsive nowrap" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Property picture</th>
+                            <th>Property Id</th>
+                            <th>Property name</th>
+                            <th>Host name</th>
+                            <th>Price per night</th>
+                            <th>Property type</th>
+                            <th>Total cancels</th>
+                            <th>Total rent days</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</body>
+</html>

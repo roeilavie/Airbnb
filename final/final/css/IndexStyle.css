@@ -1,0 +1,150 @@
+﻿
+.card img {
+    height: 250px;
+    border-radius: 10px 15px;
+}
+
+.card {
+    border-radius: 10px 15px;
+    max-height: 400px;
+}
+
+.right_side {
+    text-align: right;
+    margin-left: 50px;
+}
+
+#map {
+    text-align: left;
+    height: 400px;
+    width: 100%;
+    border-radius: 3px 3px 3px 3px;
+    text-align: left;
+}
+
+.slider {
+    width: 100%;
+}
+
+HTML CSSResult Skip Results Iframe
+EDIT ON
+body {
+    font-family: Rubik,Arial,sans-serif;
+    font-weight: 400;
+    font-size: 1rem;
+    overflow-x: hidden;
+    color: #607289;
+}
+
+.row.buttomRow {
+    justify-content: center;
+}
+
+
+h5 {
+    font-size: 1rem;
+    line-height: 1.375;
+    font-family: Rubik,Arial,sans-serif;
+    font-weight: 500;
+    color: #030929;
+}
+
+a {
+    color: #818494;
+    text-decoration: none;
+    background-color: transparent;
+}
+
+    a:hover {
+        color: #007bff;
+        text-decoration: none;
+    }
+
+footer {
+    background: #4d988e;
+}
+
+#contact {
+    position: fixed;
+    left: 10px;
+    bottom: 0;
+    z-index: 100;
+    width: 400px;
+    padding: 20px;
+    background: #b2cdc6;
+    border-radius: 5%;
+    width: 250px;
+}
+
+    #contact button {
+        background: #7cd9bb;
+        border-radius: 4px;
+    }
+
+.footer_text {
+    color: white;
+}
+
+#footer_row {
+    margin-left: 200px;
+}
+
+#contact-form_ {
+    display: none;
+    background: transparent;
+}
+
+#contact_btn {
+    transition: all 0.3s ease;
+}
+
+.animated-button {
+    height: 50%;
+}
+
+@media only screen and (max-width: 1550px) {
+    #contact_btn_ {
+        position: fixed;
+        bottom: 0px;
+        left: 2px;
+    }
+}
+
+@media only screen and (max-width: 770px) {
+    #history {
+        left: -200px;
+    }
+
+    #about {
+        left: -200px;
+    }
+}
+
+.responsive-iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 80%;
+    height: 80%;
+    margin: auto;
+}
+
+.container_iframe {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding-top: 56.25%;
+}
+
+h4 {
+    text-align: center;
+}
+
+@media only screen and (max-width: 969px) {
+    #weather_div, #forecast {
+        display: none;
+    }
+}
+

@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Journey</title>
+    <link rel="icon" href="../img/logo icon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">  <!-- Google web font "Open Sans" -->
+    <link rel="stylesheet" href="../font-awesome-4.7.0/css/font-awesome.min.css">                <!-- Font Awesome -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">                                      <!-- Bootstrap style -->
+    <link rel="stylesheet" href="../css/templatemo-style.css"> <!-- Templatemo style -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/dataTables.bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.dataTables.min.css">
+
+    <script src="../Scripts/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="../js/popper.min.js"></script>
+    <script src="../js/bootstrap.min.js"></script>
+    <script src="../js/jquery.scrollTo.min.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.19/js/dataTables.bootstrap.min.js"></script>
+    <script src="../Scripts/mutalFunctions.js"></script>
+
+    <style>
+        h4 {
+            color: red;
+            font-size: 11px;
+        }
+
+        th, td, button {
+            text-align: center;
+        }
+
+        .form-inline {
+            display: block;
+        }
+
+        table.dataTable > tbody > tr.child span.dtr-title {
+            min-width: 0px;
+        }
+
+        @media only screen and (max-width: 400px) {
+            table.dataTable > tbody > tr.child ul.dtr-details > li:first-child {
+                display: none;
+            }
+        }
+    </style>
+
+
+    <script>
+        var reserv;
+   
+        //function calculates difference in days between two dates
+        const days = (in_date, out_date) => {
+            let difference = out_date.getTime() - in_date.getTime();
+            let TotalDays = Math.ceil(difference / (1000 * 3600 * 24));
+            return TotalDays;
+        }
+
+
+        // will run when the document is ready
+        $(document).ready(function () {
+            //mode keeps the type of button pressed
+            mode = "";
+            localStorage.removeItem("property_fill");
+            localStorage.removeItem("property");
+            //showing the user name on the navbar
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            let arr = user_online.fullName.split(" ");
+            $("#hello_id").text("Hello, " + arr[0]);
+            let user_id = user_online.id;
+            // once the document is ready we fetch a list of reservations from the server
+            ajaxCall("GET", `../api/Reservations/${user_id}`, "", getSuccess, error);
+            buttonEvents();
+        });
+
+        // this function is activated in case of a success
+        function getSuccess(ReservationsData) {
+            reservations = ReservationsData;
+            try {
+                tbl = $('#ordersTable').DataTable({
+                    data: ReservationsData,
+                    pageLength: 5,
+                    columns: [
+                        { data: "Reserv_number" },
+                        { data: "Name" },
+                        { data: "Host_name" },
+                        { data: "Price" },
+                        { data: "Location" },
+                        { data: "Check_in" },
+                        { data: "Check_out" },
+                        {
+                            render: function (data, type, row, meta) {
+                                //claculating difference in check in day vs today,
+                                //so that the cancel button will be enabled only until 2 days before check in
+                                let starts = row.Check_in;
+                                let match = /(\d+)\/(\d+)\/(\d+)/.exec(starts);
+                                let check_in = new Date(match[3], match[2] - 1, match[1]);
+                                let today = new Date();
+
+                                const difference_dates = (in_date, today_) => {
+                                    let difference = in_date.getTime() - today_.getTime();
+                                    let TotalDays = Math.ceil(difference / (1000 * 3600 * 24));
+                                    return TotalDays;
+                                }
+
+                                let difference_in_days = difference_dates(check_in, today);
+                                let data_reservation = "data-ReservationId='" + row.Reserv_number + "'";
+                                //button enabled
+                                if (difference_in_days > 2) {
+                                    deleteBtn = "<button type='button' class = 'deleteBtn btn btn-danger' " + data_reservation + "> Cancel </button>";
+                                }
+                                //button disabled
+                                else {
+                                    deleteBtn = "<button disabled type='button' class = 'deleteBtn btn btn-danger' " + data_reservation + "> Cancel </button>";
+                                    deleteBtn += "<br/><br/><h4>Unable to cancel 2 days before check in</h4>";
+                                }
+                                viewBtn = "<button type='button' class = 'viewBtn btn btn-info' " + data_reservation + "> View </button>";
+                                return viewBtn + deleteBtn;
+                            }
+                        },
+                    ],
+                });
+            }
+            catch (err) {
+                alert(err);
+            }
+        }
+
+        // this function is activated in case of a failure
+        function error(err) {
+            swal("Error: " + err);
+        }
+
+        // wire all the buttons to their functions
+        function buttonEvents() {
+            $(document).on("click", ".viewBtn", function () {
+                mode = "view";
+                //get reservation number in order to get property id to send to local storage
+                //in order to render the right property page
+                var reservation_id = this.getAttribute('data-ReservationId');
+                reservation = getReservation(reservation_id);
+                property_id = reservation.Property_id;
+                localStorage.setItem("PropertyToSave", property_id);
+                window.location.href = "PropertyPage.html";
+            });
+
+            $(document).on("click", ".deleteBtn", function () {
+                mode = "delete";
+                var reservation_id = this.getAttribute('data-ReservationId');
+                swal({ // this will open a dialouge
+                    title: "Are you sure?",
+                    text: "",
+                    icon: "warning",
+                    buttons: true,
+                    dangerMode: true
+                })
+                .then(function (willDelete) {
+                    if (willDelete) DeleteReservation(reservation_id);
+                });
+            });
+        }
+
+        // Delete a reservation from the server
+        function DeleteReservation(id) {
+            reserv = getReservation(id);
+            let reserv_number = reserv.Reserv_number;
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            let user_id = user_online.id;
+            ajaxCall("DELETE", `../api/Reservations/${reserv_number}/${user_id}`, "", deleteSuccess, error);
+        }
+
+        // get a reservation according to its Id (number)
+        function getReservation(id) {
+            for (i in reservations) {
+                if (reservations[i].Reserv_number == id)
+                    return reservations[i];
+            }
+            return null;
+        }
+
+        // success callback function after delete
+        function deleteSuccess(reservations_left) {
+            //reservations left after the delete
+            reservs = reservations_left;
+            //clear the table
+            $('#ordersTable').dataTable().fnClearTable();
+            //if there are more rows in the table, render the table again
+            if (reservs != null)
+                $('#ordersTable').dataTable().fnAddData(reservs);
+            buttonEvents();
+            mode = "";
+            //after successful deletion update the user cancels, resrvations, and total income
+            let property_id = reserv.Property_id;
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            let user_total_income = calculateIncome(user_online);
+            let user_total_reservation = user_online.total_reservation - 1;
+            let user_id = user_online.id;
+            let user_total_cancellations = user_online.total_cancels + 1;
+            ajaxCall("PUT", `../api/Users/${user_total_income}/${user_total_reservation}/${user_id}/${user_total_cancellations}/${property_id}`, "", updateSCB, updateECB);
+        }
+
+        //after successful update in the database, update the user details in the localStorage
+        function updateSCB(status) {
+            if (status == 1) {
+                let user_online = JSON.parse(localStorage.getItem("user_online"));
+                user_online.total_income = calculateIncome(user_online);
+                user_online.total_reservation--;
+                user_online.total_cancels++;
+                localStorage.setItem("user_online", JSON.stringify(user_online));
+            }
+        }
+
+        //error callback function for PUT ajaxcall
+        function updateECB(err) {
+            console.log(err);
+        }
+
+        //callback function for GET reservation ajaxcall
+        function error(err) {
+            console.log(err);
+        }
+
+        //logout function
+        function logOut() {
+            localStorage.removeItem("user_online");
+            localStorage.removeItem("PropertyToSave");
+        }
+
+        //calculate income of user after deletion according to the days of reservation
+        function calculateIncome(user_online) {
+            let starts_in = reserv.Check_in;
+            let match_in = /(\d+)\/(\d+)\/(\d+)/.exec(starts_in);
+            let check_in = new Date(match_in[3], match_in[2] - 1, match_in[1]);
+            let starts_out = reserv.Check_out;
+            let match_out = /(\d+)\/(\d+)\/(\d+)/.exec(starts_out);
+            let check_out = new Date(match_out[3], match_out[2] - 1, match_out[1]);
+            let difference_in_days = days(check_in, check_out);
+            let user_total_income = user_online.total_income;
+            user_total_income = user_total_income - (difference_in_days * reserv.Price);
+            return user_total_income;
+        }
+
+    </script>
+</head>
+<body>
+    <div class="tm-main-content" id="top">
+        <div class="tm-top-bar-bg"></div>
+        <div class="tm-top-bar" id="tm-top-bar">
+            <div class="container">
+                <div class="row">
+                    <nav class="navbar navbar-expand-lg narbar-light">
+                        <a class="navbar-brand mr-auto" href="index.html">
+                            <img src="../img/logo.png" alt="Site logo">
+                            Journey
+                        </a>
+                        <button type="button" id="nav-toggle" class="navbar-toggler collapsed" data-toggle="collapse" data-target="#mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div id="mainNav" class="collapse navbar-collapse tm-bg-white">
+                            <ul class="navbar-nav ml-auto">
+                                <li class="nav-item">
+                                    <a id="hello_id" class="nav-link"></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="index.html">Home <span class="sr-only">(current)</span></a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link active" href="Orders.html">My orders</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="index.html" onclick="logOut()">Log out</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </nav>
+                </div> <!-- row -->
+            </div> <!-- container -->
+        </div> <!-- .tm-top-bar -->
+    </div>
+
+
+    <section class="p-5 tm-container-outer">
+        <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                <div class="mt-5">
+                    <table id="ordersTable" class="display responsive" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Reservation Number</th>
+                                <th>Name</th>
+                                <th>Host Name</th>
+                                <th>Price</th>
+                                <th>Location</th>
+                                <th>Check In Date</th>
+                                <th>Check Out Date</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+    </section>
+
+
+</body>
+</html>

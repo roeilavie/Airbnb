@@ -1,0 +1,423 @@
+﻿
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Journey</title>
+    <link rel="icon" href="../img/logo icon.ico" type="image/x-icon">
+    <!-- load stylesheets -->
+    <link href="../css/animationDesign.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">  <!-- Google web font "Open Sans" -->
+    <link rel="stylesheet" href="../font-awesome-4.7.0/css/font-awesome.min.css">                <!-- Font Awesome -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">                                      <!-- Bootstrap style -->
+    <link rel="stylesheet" type="text/css" href="../css/datepicker.css" />
+    <link rel="stylesheet" href="../css/templatemo-style.css"> <!-- Templatemo style -->
+    <link href="../css/IndexStyle.css" rel="stylesheet" />
+
+    <script src="https://kit.fontawesome.com/2d86eab2b9.js" crossorigin="anonymous"></script>
+    <script src="../Scripts/animation.js"></script>
+    <script src="../Scripts/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>             <!-- jQuery (https://jquery.com/download/) -->
+    <script src="../js/popper.min.js"></script>                    <!-- https://popper.js.org/ -->
+    <script src="../js/bootstrap.min.js"></script>                 <!-- https://getbootstrap.com/ -->
+    <script src="../js/datepicker.min.js"></script>                <!-- https://github.com/qodesmith/datepicker -->
+    <script src="../slick/slick.min.js"></script>                  <!-- http://kenwheeler.github.io/slick/ -->
+    <script src="../js/jquery.scrollTo.min.js"></script>           <!-- https://github.com/flesler/jquery.scrollTo -->
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="../Scripts/mutalFunctions.js"></script>
+    <script src="https://widget.rss.app/v1/carousel.js" type="text/javascript" async></script>     <!--rss -->
+
+    <script>
+
+        var map;
+        var location_ = {};
+
+        //when the page loads
+        $(document).ready(function () {
+            //check if user is online - function is written is the mutualFunctions script
+            checkOnlineUser();
+            localStorage.removeItem("property");
+            localStorage.removeItem("property_fill");
+
+            //function responsible for contact us button feature
+            toggleText();
+
+            //get all possible destinations
+            ajaxCall("GET", "../api/Properties/Destinations", "", getDestinationsSCB, getDestinationsECB);
+
+            //if there was lean search before clicking plus or minus button
+            $("#leanSearchForm").submit(function () {
+                let check_in = $("#inputCheckIn").val();
+                let check_out = $("#inputCheckOut").val();
+
+                check_in = SetDateFormat(check_in);
+                check_out = SetDateFormat(check_out);
+                let check_in_Date = new Date(check_in);
+                let check_out_Date = new Date(check_out);
+                let today = new Date();
+                if (today.getTime() > check_in_Date.getTime()) {
+                    swal("Error picking dates", "Check in date cannot be before today", "error");
+                    return false;
+                }
+                if (check_in_Date.getTime() > check_out_Date.getTime()) {
+                    swal("Error picking dates", "Check out date cannot be before check in", "error");
+                    return false;
+                }
+                SearchLeanProperty();
+                return false;
+            });
+
+            // Change top navbar on scroll
+            $(window).on("scroll", function () {
+                if ($(window).scrollTop() > 100) {
+                    $(".tm-top-bar").addClass("active");
+                } else {
+                    $(".tm-top-bar").removeClass("active");
+                }
+            });
+
+            // arrow center picture
+            $('.tm-down-arrow-link').click(function () {
+                $.scrollTo('#tm-section-search', 300, { easing: 'linear' });
+            });
+
+            // Date Picker in Search form
+            var pickerCheckIn = datepicker('#inputCheckIn');
+            var pickerCheckOut = datepicker('#inputCheckOut');
+
+        });
+
+        //rendering the top rating properties to the page
+        function getPropertiesSCB(properties) {
+            let ph = document.getElementById("ph");
+            let str = "";
+            //looping over properties to set the map and the markers
+            for (var i = 0; i < properties.length; i++) {
+                location_ = { lat: properties[i].Latitude, lng: properties[i].Longitude };
+                var Marker = new google.maps.Marker({
+                    position: location_,
+                    animation: google.maps.Animation.BOUNCE,
+                    icon: "https://www.allianceforthebay.org/wp-content/themes/acb/img/marker-blue.png",
+                });
+                //setting the info window html content
+                var content = `<div style='float:left'>
+                                                    <a href ="PropertyPage.html"  onclick= "propertyPage(${properties[i].Id})">
+                                                    <img style='height:150px;border-radius: 50%; width:150px;padding:5%' src= ${properties[i].Picture_url}>
+                                                    </a></div><div style='float:right; padding: 10px;'><h6>Neigborhood:</h6>${properties[i].Neighbourhood}<br/><br/><h6>Price:</h6>${properties[i].Price} $<br/>
+                                                    <br/><h6>Bedrooms:</h6>${properties[i].Bedrooms}</div>`;
+                //adding info window to marker
+                var infowindow = new google.maps.InfoWindow();
+
+                //when clicking the marker - show info window
+                google.maps.event.addListener(Marker, 'click', (function (Marker, content, infowindow) {
+                    return function () {
+                        infowindow.setContent(content);
+                        infowindow.open(map, Marker);
+                    };
+                })(Marker, content, infowindow));
+
+                //adding marker to map
+                Marker.setMap(map);
+                //setting the cards of the top rating properties
+                let src = properties[i].Picture_url;
+                str += "<div class='col-lg-3 col-md-6 col-sm-6 mt-4'>";
+                str += `<p class = "tm-text-highlight">${properties[i].Location}</p>`;
+                str += `<div class = 'card' id = ${properties[i].Id} onclick='propertyPage(${properties[i].Id})'>`;
+                str += edit(properties[i], src);
+                str += "</div>";
+            }
+            ph.innerHTML = str;
+            //responsible for the animation of top rating properties
+            animation(ph);
+        }
+
+        //ajaxcall failed, write to the log
+        function getPropertiesECB(err) {
+            console.log(err);
+        }
+
+        //using for rendering the property card at index page- top rating properties
+        function edit(property, src) {
+            let str = "";
+            str += `<a href='PropertyPage.html'><img class = 'card-img-top' src = '${src}' alt = 'Card image cap'/></a></div>`;
+            str += `<p class = "tm-text-gray">`;
+
+            for (var i = 0; i < property.Accommodates; i++) {
+                str += `<i class="fa-solid fa-person"></i>`;
+            }
+            str += `<span class="right_side">${property.Bedrooms} Bedrooms</span></br><span class = "h4 mr-4">${property.Price}$</span></p>`;
+            return str;
+        }
+
+        //if the user press on property, move to property page
+        function propertyPage(id) {
+            localStorage.setItem("PropertyToSave", id);
+            window.location.href = "PropertyPage.html";
+        }
+
+        //insert the possible destinations and do ajaxcall for render the top rating properties
+        function getDestinationsSCB(destinationsData) {
+            destinations = destinationsData;
+            localStorage.setItem("destinations", JSON.stringify(destinations));
+            setDestinations();
+            //getting all the properties to render them on index page
+            ajaxCall("GET", "../api/Properties", "", getPropertiesSCB, getPropertiesECB);
+        }
+
+        //ajaxcall failed, write to the log
+        function getDestinationsECB(err) {
+            console.log(err);
+        }
+
+        // show and hide contact
+        function toggleText() {
+            var x = document.getElementById("contact-form_"); //form
+            var con = document.getElementById("contact");
+            if (x.style.display === "none") {
+                x.style.display = "block";
+                con.style.backgroundColor = "#b2cdc6";
+            } else {
+                x.style.display = "none";
+                con.style.backgroundColor = "transparent";
+            }
+        }
+
+        //google maps initialze
+        function initMap() {
+            // The location of amsterdam
+            const amsterdam = { lat: 52.377956, lng: 4.897070 };
+            // The map, centered at amsterdam
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: amsterdam,
+            });
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+    <div class="tm-main-content" id="top">
+        <div class="tm-top-bar-bg"></div>
+        <div class="tm-top-bar" id="tm-top-bar">
+            <div class="container">
+                <div class="row">
+                    <!-- navbar header -->
+                    <nav class="navbar navbar-expand-lg narbar-light">
+                        <a class="navbar-brand mr-auto" href="index.html">
+                            <img src="../img/logo.png" alt="Site logo">
+                            Journey
+                        </a>
+                        <button type="button" id="nav-toggle" class="navbar-toggler collapsed" data-toggle="collapse" data-target="#mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div id="mainNav" class="collapse navbar-collapse tm-bg-white">
+                        </div>
+                    </nav>
+                </div> <!-- row -->
+            </div> <!-- container -->
+        </div> <!-- .tm-top-bar -->
+
+        <div class="tm-page-wrap mx-auto">
+            <section class="tm-banner">
+                <div class="tm-container-outer tm-banner-bg">
+                    <div class="container">
+                        <div class="row tm-banner-row tm-banner-row-header">
+                            <div class="col-xs-12">
+                                <div class="tm-banner-header">
+                                    <h1 class="text-uppercase tm-banner-title">Let's begin</h1>
+                                    <img src="../img/dots-3.png" alt="Dots">
+                                    <p class="tm-banner-subtitle">We assist you to choose the best.</p>
+                                    <a href="javascript:void(0)" class="tm-down-arrow-link"><i class="fa fa-2x fa-angle-down tm-down-arrow"></i></a>
+                                </div>
+                            </div>  
+                        </div> <!-- row -->
+                        <div class="row tm-banner-row" id="tm-section-search">
+
+                            <!-- search form - lean -->
+
+                            <form action="" method="get" class="tm-search-form tm-section-pad-2" id="leanSearchForm">
+                                <div class="form-row tm-search-form-row">
+                                    <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                        <label for="inputCity">Choose Your Destination</label>
+                                        <select name="destination" class="form-control tm-select" id="inputDestination"></select>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-1">
+                                        <div class="form-group tm-form-group tm-form-group-pad tm-form-group-2">
+                                            <label for="inputCheckIn">Check In Date</label>
+                                            <input name="check-in" type="text" class="form-control" id="inputCheckIn" placeholder="Check In" required onkeydown="event.preventDefault()">
+                                        </div>
+                                        <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                            <label for="inputCheckOut">Check Out Date</label>
+                                            <input name="check-out" type="text" class="form-control" id="inputCheckOut" placeholder="Check Out" required onkeydown="event.preventDefault()">
+                                        </div>
+                                    </div>
+                                </div> <!-- form-row -->
+                                <div class="form-row tm-search-form-row text-center row buttomRow">
+                                    <div class="form-group tm-form-group">
+                                        <button type="submit" class="btn btn-primary tm-btn tm-btn-search text-uppercase" id="btn_lean_Submit">Check Availability</button>
+                                    </div>
+                                    <div class="form-group tm-form-group tm-form-group-pad">
+                                        <button type="button" class="btn btn-primary tm-btn" onclick="advanced()">+</button>
+                                    </div>
+                                </div>
+                            </form>
+
+                        </div> <!-- row -->
+                        <div class="tm-banner-overlay"></div>
+                    </div>  <!-- .container -->
+                </div>     <!-- .tm-container-outer -->
+            </section>
+
+            <section class="tm-container-outer tm-bg-gray">
+                <br /><br />
+                <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                    <h2 class="text-uppercase mb-4"><strong>Top</strong> rating properties</h2>
+                </div>
+                <div class="container">
+                    <div class="row">
+                        <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                            <!-- top rating properties -->
+                            <div class="row mt-3" id="ph">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <br />
+                <br />
+
+                <!-- Map -->
+
+                <div class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                    <h2 class="text-uppercase mb-4"><strong>Map</strong> for top rating properties</h2>
+                    <div id="map"></div>
+                </div>
+                <br />
+                <br />
+                <!-- weather -->
+
+                <h4 class="text-uppercase mb-4" id="forecast"><strong>7 Days Forecast</strong> in Amsterdam</h4>
+                <div id="weather_div" class="col-xs-12 mx-auto tm-about-text-wrap text-center">
+                    <iframe src="https://www.meteoblue.com/en/weather/widget/three/amsterdam_netherlands_2759794?geoloc=fixed&nocurrent=0&nocurrent=1&noforecast=0&days=7&tempunit=CELSIUS&windunit=KILOMETER_PER_HOUR&layout=image"
+                            frameborder="0" scrolling="NO" allowtransparency="true" sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox" style="width: 100%; height: 515px"></iframe>
+                    <div><a href="https://www.meteoblue.com/en/weather/week/amsterdam_netherlands_2759794?utm_source=weather_widget&utm_medium=linkus&utm_content=three&utm_campaign=Weather%2BWidget" target="_blank" rel="noopener">meteoblue</a></div>
+                </div>
+                <br />-
+                <br />
+                <h4 class="text-uppercase mb-4"><strong>Best things</strong> to do in Amsterdam</h4>
+                <!--rss for food-->
+                <rssapp-carousel id="Z3v1cws4ZxPAqIsn"></rssapp-carousel>
+                <br />
+                <br />
+                <br />
+                <br />
+            </section>
+
+            <div class="tm-container-outer tm-position-relative" id="tm-section-4">
+            </div>
+        </div>
+        <!-- contact us form -->
+
+        <div class="col-md-3 col-sm-12 mb-3 text-center" id="contact">
+            <a class="btn btn-primary tm-btn" id="contact_btn_" style="color:black;" onclick="toggleText() ">
+                <strong>Contact Us</strong>
+            </a>
+            <br />
+            <br />
+            <form id="contact-form_" action="https://formspree.io/f/xknywvlv" method="post" class="contact-form">
+                <div class="form-group">
+                    <input type="text" class="form-control" name="name" placeholder="Your Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" class="form-control" name="email" placeholder="Your Email" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" name="subject" placeholder="Subject" required>
+                </div>
+                <div class="form-group">
+                    <textarea id="" cols="30" rows="3" name="message" class="form-control" placeholder="Message" required></textarea>
+                </div>
+                <div class="form-group">
+                    <button name="submit" type="submit" class="form-control submit px-3"><strong>Send</strong></button>
+                </div>
+            </form>
+        </div>
+
+        <!-- footer -->
+        <footer>
+            <a class="navbar-brand mr-auto">
+                <img src="../img/logo.png" alt="Site logo">
+            </a>
+            <br />
+            <h5 style="color:aliceblue">Journey</h5>
+
+            <div class="container pt-5 border-bottom">
+
+                <div class="row" id="footer_row">
+                    <div class="col-md-9 col-sm-12">
+                        <div id="history" class="col-md-3 col-sm-6 col-6 p-0 float-left mb-3">
+                            <h5 class="mb-4 font-weight-bold text-uppercase">History</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2 footer-heading footer_text">Our website was created on May 2022!</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3 col-sm-6 col-6 p-0 mb-3 float-left">
+                            <h5 class="mb-4 font-weight-bold text-uppercase">Other Links</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://www.youtube.com" target="_blank"><i class="fa fa-youtube mr-1"></i> YouTube</a>
+                                </li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://www.linkedin.com"><i class="fa fa-linkedin mr-1"></i> LinkedIn</a>
+                                </li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://github.com" target="_blank"><i class="fa fa-github mr-1"></i> Github</a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div id="about" class="col-md-3 col-sm-6 col-6 mb-3 p-0 float-left">
+                            <h5 class="mb-4 font-weight-bold text-uppercase">About</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2 footer_text"></i>We guarantee the best experience!</li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="additions.html"><i class="fa mr-1"></i> Additions</a>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="col-md-3 col-sm-6 col-6 mb-3 p-0 float-left">
+                            <h5 class="mb-4 font-weight-bold text-uppercase">Social</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://twitter.com"><i class="fa fa-twitter mr-1"></i> Twitter</a>
+                                </li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://www.reddit.com"><i class="fa fa-reddit mr-1"></i> Reddit</a>
+                                </li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://plus.google.com" target="_blank"><i class="fa fa-google-plus mr-1"></i> Google+</a>
+
+                                </li>
+                                <li class="list-group-item bg-transparent border-0 p-0 mb-2">
+                                    <a href="https://www.facebook.com" target="_blank"><i class="fa fa-facebook mr-1"></i> Facebook</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+    <!-- map script -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDc6bODrRoh3awdyABYFaDcXZKMVQWlHEA&callback=initMap&v=weekly"
+            defer></script>
+
+
+</body>
+</html>

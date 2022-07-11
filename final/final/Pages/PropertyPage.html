@@ -1,0 +1,613 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Journey</title>
+    <link rel="icon" href="../img/logo icon.ico" type="image/x-icon">
+
+    <!-- load stylesheets -->
+    <link rel="stylesheet" href="../css/backToTopButton.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">  <!-- Google web font "Open Sans" -->
+    <link rel="stylesheet" href="../font-awesome-4.7.0/css/font-awesome.min.css">                <!-- Font Awesome -->
+    <link rel="stylesheet" href="../css/bootstrap.min.css">                                      <!-- Bootstrap style -->
+    <link rel="stylesheet" type="text/css" href="../css/datepicker.css" />
+    <link rel="stylesheet" type="text/css" href="../slick/slick.css" />
+    <link rel="stylesheet" type="text/css" href="../slick/slick-theme.css" />
+    <link rel="stylesheet" href="../css/templatemo-style.css">                                   <!-- Templatemo style -->
+    <link href="../css/PropertyPageStyle.css" rel="stylesheet" />
+
+
+    <script src="https://kit.fontawesome.com/2d86eab2b9.js" crossorigin="anonymous"></script>
+    <script src="../Scripts/ajaxCalls.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>             <!-- jQuery (https://jquery.com/download/) -->
+    <script src="../js/popper.min.js"></script>                    <!-- https://popper.js.org/ -->
+    <script src="../js/bootstrap.min.js"></script>                 <!-- https://getbootstrap.com/ -->
+    <script src="../js/datepicker.min.js"></script>                <!-- https://github.com/qodesmith/datepicker -->
+    <script src="../slick/slick.min.js"></script>                  <!-- http://kenwheeler.github.io/slick/ -->
+    <script src="../js/jquery.scrollTo.min.js"></script>           <!-- https://github.com/flesler/jquery.scrollTo -->
+    <script src="../Scripts/mutalFunctions.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="https://cdn.polyfill.io/v2/polyfill.min.js"></script>
+    <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=fetch"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.0.0/polyfill.min.js"></script>
+    <script src="https://kit.fontawesome.com/2d86eab2b9.js" crossorigin="anonymous"></script>
+
+    <style>
+        @media only screen and (max-width: 680px) {
+            .fa-solid {
+                display: none;
+            }
+        }
+    </style>
+
+    <script>
+        var reservation;
+        var difference_in_days;
+        var location_ = {};
+        var map;
+
+        //function calculates difference in days between two dates
+        const days = (in_date, out_date) => {
+            let difference = out_date.getTime() - in_date.getTime();
+            let TotalDays = Math.ceil(difference / (1000 * 3600 * 24));
+            return TotalDays;
+        }
+
+        //when the page load
+        $(document).ready(function () {
+            //check if user is online - admin/ regular users
+            checkOnlineUser();
+            let property_id = localStorage.getItem("PropertyToSave");
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            //is admin is logged in or regular user(that is not registered), remove check in check out options
+            if (user_online != undefined) {
+                if (user_online.fullName.localeCompare("admin") == 0) {
+                    //hide check in check out options and book button option
+                    $("#book_property").css("visibility", "hidden");
+                    $("#slideBook").css("visibility", "hidden");
+                }
+                else {
+                    $("#book_property").css("visibility", "visible");
+                    $("#slideBook").css("visibility", "visible");
+                }
+            }
+            else {
+                $("#book_property").css("visibility", "visible");
+                $("#slideBook").css("visibility", "visible");
+            }
+
+
+            ajaxCall("GET", `../api/Properties/${property_id}`, "", getPropertySCB, getPropertyECB);
+
+            // Change top navbar on scroll
+            $(window).on("scroll", function () {
+                if ($(window).scrollTop() > 100) {
+                    $(".tm-top-bar").addClass("active");
+                } else {
+                    $(".tm-top-bar").removeClass("active");
+                }
+            });
+
+
+            var pickerCheckIn = datepicker('#inputCheckIn');
+            var pickerCheckOut = datepicker('#inputCheckOut');
+
+
+            //arrow button back to top
+            const backToTopButton = document.querySelector("#back-to-top-btn");
+            window.addEventListener("scroll", scrollFunction);
+            backToTopButton.addEventListener("click", smoothScrollBackToTop);
+
+            function smoothScrollBackToTop() {
+                const targetPosition = 0;
+                const startPosition = window.pageYOffset;
+                const distance = targetPosition - startPosition;
+                const duration = 750;
+                let start = null;
+                window.requestAnimationFrame(step);
+                function step(timestamp) {
+                    if (!start) start = timestamp;
+                    const progress = timestamp - start;
+                    window.scrollTo(0, easeInOutCubic(progress, startPosition, distance, duration));
+                    if (progress < duration) window.requestAnimationFrame(step);
+                }
+            }
+
+            function easeInOutCubic(t, b, c, d) {
+                t /= d / 2;
+                if (t < 1) return c / 2 * t * t * t + b;
+                t -= 2;
+                return c / 2 * (t * t * t + 2) + b;
+            }
+
+            function scrollFunction() {
+                if (window.pageYOffset > 300) { // Show backToTopButton
+                    if (!backToTopButton.classList.contains("btnEntrance")) {
+                        backToTopButton.classList.remove("btnExit");
+                        backToTopButton.classList.add("btnEntrance");
+                        backToTopButton.style.display = "block";
+                    }
+                }
+                else { // Hide backToTopButton
+                    if (backToTopButton.classList.contains("btnEntrance")) {
+                        backToTopButton.classList.remove("btnEntrance");
+                        backToTopButton.classList.add("btnExit");
+                        setTimeout(function () {
+                            backToTopButton.style.display = "none";
+                        }, 250);
+                    }
+                }
+            }
+        });
+
+        function getPropertySCB(propertyData) {
+            property = propertyData;
+            //map settings - adding marker of the property on the map
+            location_ = { lat: property.Latitude, lng: property.Longitude };
+
+            var Marker = new google.maps.Marker({
+                position: location_,
+                animation: google.maps.Animation.BOUNCE,
+                icon: "https://www.allianceforthebay.org/wp-content/themes/acb/img/marker-blue.png",
+            });
+            //adding marker to map
+            Marker.setMap(map);
+            //setting html of the page
+            $("#description").html(property.Description);
+            $("#name").text(property.Name);
+            $("#location").text(property.Location);
+
+            let str = `${property.Price}/night`;
+            $("#price").text(str);
+            $("#img").attr("src", property.Picture_url);
+            $("#neighbourhood").text(property.Neighbourhood);
+            $("#neighborhoodOverview").html(property.Neighborhood_overview);
+            $("#propertyType").text(property.Property_type);
+            $("#roomType").text(property.Room_type);
+            $("#accommodates").text(property.Accommodates);
+            $("#bedrooms").text(property.Bedrooms);
+            $("#beds").text(property.Beds);
+            $("#bathrooms").text(property.Bathrooms_text);
+            $("#minNights").text(property.Minimum_nights);
+            $("#maxNights").text(property.Maximum_nights);
+            $("#hostResponseTime").text(property.Host_response_time);
+            $("#hostResponseRate").text(property.Host_response_rate);
+
+            str = "";
+            for (var i = 0; i < property.Amenities.length - 1; i++) {
+                str += property.Amenities[i] + ", ";
+            }
+            str += property.Amenities[property.Amenities.length - 1];
+            $("#amenities").text(str);
+
+            let arr = property.Host_since.split(" ");
+            $("#since").text(arr[0]);
+
+            let review = Math.round(property.Review_scores_rating * 10) / 10;
+            $("#reviewRating").text(review);
+            review = Math.round(property.Review_scores_cleanliness * 10) / 10;
+            $("#reviewCleanliness").text(review);
+            review = Math.round(property.Review_scores_communication * 10) / 10;
+            $("#reviewCommunication").text(review);
+            review = Math.round(property.Review_scores_location * 10) / 10;
+            $("#reviewLocation").text(review);
+            review = Math.round(property.Review_scores_checkin * 10) / 10;
+            $("#reviewCheckIn").text(review);
+
+            let property_id = property.Id;
+            ajaxCall("GET", `../api/Reviews/${property_id}`, "", getReviewsSCB, getReviewsECB);
+
+        }
+
+        //if the ajaxcall failed write to the console
+        function getPropertyECB(property) {
+            console.log(property);
+        }
+
+        //render the reviews
+        function getReviewsSCB(reviews) {
+            let str = "";
+            for (var i = 0; i < reviews.length; i++) {
+                let date = reviews[i].Date.split(" ");
+                str += `<div class="review">
+                                                        <h6>${reviews[i].Reviewer_name}</h6>
+                                                        <p>Date: ${date[0]} <br/> ${reviews[i].Comments}</p><br/></div>`;
+            }
+
+            $("#mainReviews").html(str);
+            $("#top").css("visibility", "visible");
+            if (localStorage.getItem("property_fill") != undefined)
+                fillSearchForm();
+        }
+
+        //if the ajaxcall failed write to the console
+        function getReviewsECB(err) {
+            console.log(err);
+        }
+
+        //book the property
+        function book() {
+            //if the user is not logged in - they can't book - go to Login page
+            if (localStorage.getItem("user_online") == undefined) {
+                swal("You need to login first", "You need to sign in or sign up to make reservation", "error").then(function () {
+                    window.location.href = "Login.html";
+                });
+            }
+            //only if the user is logged in - they can book a property
+            else {
+                let check_in = SetDateFormat($("#inputCheckIn").val());
+                let check_out = SetDateFormat($("#inputCheckOut").val());
+                let is_valid = check_dates(check_in, check_out);
+                if (!is_valid) {
+                    return;
+                }
+                if (difference_in_days < property.Minimum_nights || difference_in_days > property.Maximum_nights) {
+                    swal("Invalid for this dates", `Minimun ${property.Minimum_nights} nights and maximum ${property.Maximum_nights} nights`, "error");
+                    return;
+                }
+                ajaxCall("POST", `../api/Reservations`, JSON.stringify(reservation), postReservationSCB, postReservationECB);
+            }
+        }
+
+        //function calculates difference between two days
+        function check_dates(check_in, check_out) {
+            let check_in_Date = new Date(check_in);
+            let check_out_Date = new Date(check_out);
+            difference_in_days = days(check_in_Date, check_out_Date);
+            let total_amount = difference_in_days * property.Price;
+            let today = new Date();
+            if (today.getTime() > check_in_Date.getTime()) {
+                swal("Error picking dates", "Check in date cannot be before today", "error");
+                return false;
+            }
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            reservation = {
+                Property_id: localStorage.getItem("PropertyToSave"),
+                User_id: user_online.id,
+                Check_in: check_in,
+                Check_out: check_out,
+                Total_amount: total_amount
+            }
+            return true;
+        }
+
+        //if the booking succeded
+        function postReservationSCB(status) {
+            //if the booking successeded
+            if (status == 1) {
+                let user_online = JSON.parse(localStorage.getItem("user_online"));
+                let user_total_income = user_online.total_income;
+                user_total_income += difference_in_days * property.Price;
+                let user_total_reservation = user_online.total_reservation + 1;
+                let user_id = user_online.id;
+                //update the number of reservations, and total income for this user
+                ajaxCall("PUT", `../api/Users/${user_total_income}/${user_total_reservation}/${user_id}`, "", updateSCB, updateECB);
+            }
+            //booking failed
+            else {
+                swal("Invalid for this dates", "The property is taken for the dates, try to pick different dates", "error");
+                return;
+            }
+        }
+
+        //callback function for successful update
+        function updateSCB(numaffected) {
+            //if the update on the database succeded then update localStorage
+            let user_online = JSON.parse(localStorage.getItem("user_online"));
+            user_online.total_reservation += 1;
+            user_online.total_income += difference_in_days * property.Price;
+            localStorage.setItem("user_online", JSON.stringify(user_online));
+            swal("Reservation succeded", "Congrats, the property saved for you", "success").then(function () {
+                window.location.href = "Orders.html";
+            });
+        }
+
+        //callback function for error in update user
+        function updateECB(err) {
+            console.log(err);
+        }
+
+        //if the booking failed write to the log
+        function postReservationECB(err) {
+            console.log(err);
+        }
+
+        //google maps initialze
+        function initMap() {
+            // The location of amsterdam
+            const amsterdam = { lat: 52.377956, lng: 4.897070 };
+            // The map, centered at amsterdam
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 12,
+                center: amsterdam,
+            });
+        }
+
+    </script>
+
+</head>
+
+<body>
+
+
+    <button id="back-to-top-btn"><i class="fas fa-angle-double-up"></i></button>
+    <div class="tm-main-content tm-bg-gray" id="top">
+        <div class="tm-top-bar-bg"></div>
+        <div class="tm-top-bar" id="tm-top-bar">
+            <div class="container">
+                <div id="above_nav_bar" class="row">
+                    <nav id="nav_bar_previous" class="navbar navbar-expand-lg narbar-light">
+                        <a class="navbar-brand mr-auto" href="index.html">
+                            <img src="../img/logo.png" alt="Site logo">Journey
+                        </a>
+                        <button type="button" id="nav-toggle" class="navbar-toggler collapsed" data-toggle="collapse" data-target="#mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div id="mainNav" class="collapse navbar-collapse tm-bg-white">
+                        </div>
+                    </nav>
+                </div> <!-- row -->
+            </div> <!-- container -->
+        </div> <!-- .tm-top-bar -->
+        <!-- Page Content-->
+        <!-- Section Catalog Single Left-->
+        <div class="container">
+            <br /><div class="row" id="first_line">
+                <div class="col-12 col-md-8 col-lg-4">
+                    <p>Name</p><p id="name" class="h5"></p>
+                </div>
+                <div class="col-12 col-md-8 col-lg-4 col-xl-3">
+                    <p>Location</p>
+                    <p id="location" class="h5"></p>
+                </div>
+                <div class="col-12 col-md-8 col-lg-4 col-xl-2 offset-xl-1">
+                    <p>Price</p>
+                    <p id="price" class="h5"></p>
+                </div>
+            </div>
+        </div>
+
+        <section class="tm-container-outer tm-bg-white">
+            <div class="row">
+                <div class="col-12  col-sm-12 col-md-12 col-lg-8  ">
+                    <!-- Slick Carousel-->
+                    <div><br /><br /><img id="img" /><br /><br /><br /></div>
+
+                    <!-- details accordion-->
+                    <div class="container_  col-12 col-md-12 col-lg-8">
+                        <div class="accordion">
+                            <dl>
+                                <dt>
+                                    <a href="#accordion1" aria-expanded="false" aria-controls="accordion1" class="accordion-title accordionTitle js-accordionTrigger">Description</a>
+                                </dt>
+                                <dd class="accordion-content accordionItem is-collapsed" id="accordion1" aria-hidden="true">
+                                    <div id="description"></div>
+
+                                </dd>
+                                <dt>
+                                    <a href="#accordion2" aria-expanded="false" aria-controls="accordion2" class="accordion-title accordionTitle js-accordionTrigger">
+                                        Overview
+                                    </a>
+                                </dt>
+                                <dd class="accordion-content accordionItem is-collapsed" id="accordion2" aria-hidden="true">
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="table-responsive">
+                                                <table>
+                                                    <tbody>
+                                                        <tr>
+                                                            <td>Neighbourhood <i class="fa-solid fa-tree-city ml-2 pull-right"></i></td>
+                                                            <td id="neighbourhood"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Neighbourhood overview <i class="fa-solid fa-map-location-dot ml-2 pull-right "></i></td>
+                                                            <td id="neighborhoodOverview"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Property type <i class="fa-solid fa-house-chimney-user ml-2 pull-right"></i></td>
+                                                            <td id="propertyType"></td>
+                                                        </tr>
+                                                        <tr>
+
+                                                            <td>Room type <i class="fa-solid fa-person-booth ml-2 pull-right"></i></td>
+                                                            <td id="roomType"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Accommodates<i class="fa-solid fa-person ml-2 pull-right"></i></td>
+                                                            <td id="accommodates"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>
+                                                                Bedrooms <i class="fa-solid fa-couch ml-2 pull-right"></i>
+                                                            </td>
+                                                            <td id="bedrooms"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Beds   <i class="fa-solid fa-bed ml-2 pull-right"></i></td>
+                                                            <td id="beds">
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Bathrooms <i class="fa-solid fa-bath ml-2 pull-right"></i></td>
+                                                            <td id="bathrooms"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Amenities <i class="fa-solid fa-kitchen-set ml-2 pull-right"></i></td>
+                                                            <td id="amenities"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Min nights <i class="fa-solid fa-house-night ml-2 pull-right"></i></td>
+                                                            <td id="minNights"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Max nights <i class="fa-solid fa-house-night ml-2 pull-right"></i></td>
+                                                            <td id="maxNights"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Exist since</td>
+                                                            <td id="since"></td>
+                                                        </tr>
+                                                        <tr>
+
+                                                            <td>Host response time</td>
+                                                            <td id="hostResponseTime"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Host response rate</td>
+                                                            <td id="hostResponseRate"></td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Review rating</td>
+                                                            <td id="reviewRating">stars</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Review check-in</td>
+                                                            <td id="reviewCheckIn">stars</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Review cleanliness</td>
+                                                            <td id="reviewCleanliness">stars</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Review communication</td>
+                                                            <td id="reviewCommunication">stars</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td>Review location</td>
+                                                            <td id="reviewLocation">stars</td>
+                                                        </tr>
+
+
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </dd>
+                                <dt>
+                                    <a href="#accordion3" aria-expanded="false" aria-controls="accordion3" class="accordion-title accordionTitle js-accordionTrigger">
+                                        Reviews
+                                    </a>
+                                </dt>
+                                <dd class="accordion-content accordionItem is-collapsed" id="accordion3" aria-hidden="true">
+
+                                    <div id="mainReviews">
+                                    </div>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+
+
+
+                </div>
+                <div class="col-12  col-sm-12 col-md-12 col-lg-4  ">
+                    <div class="sidebar sidebar-mod-1">
+                        <div class="sidebar-module">
+                            <!--Google map.-->
+                            <br />
+                            <br />
+                            <div id="map">
+
+                                <div class="google-map google-map-4"></div>
+                                <ul class="google-map-markers"></ul>
+                            </div>
+                            <br /><br />
+                            <div id="slideBook">
+                                <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                    <label for="inputCheckIn">Check In Date</label>
+                                    <input name="check-in" type="text" class="form-control" id="inputCheckIn" placeholder="Check In" required onkeydown="event.preventDefault()">
+                                </div>
+                                <div class="form-group tm-form-group tm-form-group-pad tm-form-group-1">
+                                    <label for="inputCheckOut">Check Out Date</label>
+                                    <input name="check-out" type="text" class="form-control" id="inputCheckOut" placeholder="Check Out" required onkeydown="event.preventDefault()">
+                                </div>
+                            </div>
+                            <div class="tab-pane fade show active text-center" id="book_property">
+                                <button class="btn btn-primary tm-btn text-uppercase" id="book_reservation" onclick="book()">Book Now</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+ 
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDc6bODrRoh3awdyABYFaDcXZKMVQWlHEA&callback=initMap&v=weekly"
+            defer></script>
+
+
+
+
+    <script>
+
+        //uses classList, setAttribute, and querySelectorAll
+        //if you want this to work in IE8/9 youll need to polyfill these
+        (function () {
+            var d = document,
+                accordionToggles = d.querySelectorAll('.js-accordionTrigger'),
+                setAria,
+                setAccordionAria,
+                switchAccordion,
+                touchSupported = ('ontouchstart' in window),
+                pointerSupported = ('pointerdown' in window);
+
+            skipClickDelay = function (e) {
+                e.preventDefault();
+                e.target.click();
+            }
+
+            setAriaAttr = function (el, ariaType, newProperty) {
+                el.setAttribute(ariaType, newProperty);
+            };
+            setAccordionAria = function (el1, el2, expanded) {
+                switch (expanded) {
+                    case "true":
+                        setAriaAttr(el1, 'aria-expanded', 'true');
+                        setAriaAttr(el2, 'aria-hidden', 'false');
+                        break;
+                    case "false":
+                        setAriaAttr(el1, 'aria-expanded', 'false');
+                        setAriaAttr(el2, 'aria-hidden', 'true');
+                        break;
+                    default:
+                        break;
+                }
+            };
+            //function
+            switchAccordion = function (e) {
+                console.log("triggered");
+                e.preventDefault();
+                var thisAnswer = e.target.parentNode.nextElementSibling;
+                var thisQuestion = e.target;
+                if (thisAnswer.classList.contains('is-collapsed')) {
+                    setAccordionAria(thisQuestion, thisAnswer, 'true');
+                } else {
+                    setAccordionAria(thisQuestion, thisAnswer, 'false');
+                }
+                thisQuestion.classList.toggle('is-collapsed');
+                thisQuestion.classList.toggle('is-expanded');
+                thisAnswer.classList.toggle('is-collapsed');
+                thisAnswer.classList.toggle('is-expanded');
+
+                thisAnswer.classList.toggle('animateIn');
+            };
+            for (var i = 0, len = accordionToggles.length; i < len; i++) {
+                if (touchSupported) {
+                    accordionToggles[i].addEventListener('touchstart', skipClickDelay, false);
+                }
+                if (pointerSupported) {
+                    accordionToggles[i].addEventListener('pointerdown', skipClickDelay, false);
+                }
+                accordionToggles[i].addEventListener('click', switchAccordion, false);
+            }
+            let allAccordions = document.querySelectorAll(".js-accordionTrigger");
+            allAccordions[0].click();
+
+        })();
+    </script>
+
+</body>
+</html>
